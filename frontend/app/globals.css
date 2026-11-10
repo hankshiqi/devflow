@@ -1,0 +1,137 @@
+/* 学习导读｜全局样式：载入 Tailwind，再补充页面和 Markdown 答案的展示规则。 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 根页面保持至少一屏高，供共享布局填充背景。 */
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  color: #17212b;
+  background: #f4f6f7;
+}
+
+/* 表单控件继承正文字体，避免浏览器默认控件与页面字号不一致。 */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  color: #ffffff;
+  background: #0f766e;
+}
+
+/* 代码/日志允许换行，避免长文本撑破容器。 */
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 聊天答案使用 Markdown 渲染，以下规则统一标题、列表、代码块与表格间距。 */
+.markdown-body {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.markdown-body :where(p, ul, ol, pre, blockquote, table) {
+  margin: 0;
+}
+
+.markdown-body :where(h1, h2, h3) {
+  margin: 0.15rem 0 0;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #17212b;
+}
+
+.markdown-body h1 {
+  font-size: 1.15rem;
+}
+
+.markdown-body h2 {
+  font-size: 1.05rem;
+}
+
+.markdown-body h3 {
+  font-size: 0.98rem;
+}
+
+.markdown-body :where(ul, ol) {
+  padding-left: 1.25rem;
+}
+
+.markdown-body ul {
+  list-style: disc;
+}
+
+.markdown-body ol {
+  list-style: decimal;
+}
+
+.markdown-body li + li {
+  margin-top: 0.25rem;
+}
+
+.markdown-body code {
+  border-radius: 0.25rem;
+  background: #f2eee8;
+  padding: 0.08rem 0.3rem;
+  font-size: 0.88em;
+}
+
+/* 代码块单独设置滚动和背景；内部 code 再移除行内代码样式，避免样式叠加。 */
+.markdown-body pre {
+  overflow: auto;
+  border: 1px solid #dde5ea;
+  border-radius: 0.5rem;
+  background: #fbf7f2;
+  padding: 0.75rem;
+}
+
+.markdown-body pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.markdown-body blockquote {
+  border-left: 3px solid #14b8a6;
+  padding-left: 0.75rem;
+  color: #475569;
+}
+
+/* 宽表格在自己的容器内横向滚动，避免整个页面被撑宽。 */
+.markdown-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.markdown-body table {
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid #dde5ea;
+  padding: 0.45rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-body th {
+  background: #f3f7f8;
+  color: #17212b;
+  font-weight: 700;
+}
+
+.markdown-body tr:nth-child(even) td {
+  background: #fbf7f2;
+}

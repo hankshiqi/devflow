@@ -1,0 +1,87 @@
+# 学习导读｜本地基础设施编排：PostgreSQL 保存业务数据，Milvus 保存向量。
+# etcd 保存 Milvus 元数据，MinIO 提供对象存储；Redis 位于 optional profile。
+# 这里只启动依赖服务，FastAPI 与 Next.js 仍按 README 的命令分别启动。
+services:
+  # 关系库负责 Repository、Issue、PR、Document 等业务表；数据卷使容器重建后仍能保留数据。
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: devflow-ai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-devflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devflow}
+      POSTGRES_DB: ${POSTGRES_DB:-devflow}
+    ports:
+      - "5432:5432"
+    volumes:
+      - devflow_postgres_data:/var/lib/postgresql/data
+      # 此初始化脚本为首次创建的数据库启用 pgvector；当前 RAG 向量后端仍是 Milvus。
+      - ./scripts/init_pgvector.sql:/docker-entrypoint-initdb.d/01-init-pgvector.sql:ro
+    # 健康检查判断 PostgreSQL 是否可接受连接，区别于容器进程是否已启动。
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devflow} -d ${POSTGRES_DB:-devflow}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # 可选 Redis 服务；默认不随普通 compose up 启用，需指定 optional profile。
+  redis:
+    image: redis:7-alpine
+    container_name: devflow-ai-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    profiles:
+      - optional
+
+  # Milvus 依赖的元数据服务，不是应用业务表的存储位置。
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    container_name: devflow-ai-etcd
+    restart: unless-stopped
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_SNAPSHOT_COUNT: "50000"
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls=http://0.0.0.0:2379 --data-dir=/etcd
+    volumes:
+      - devflow_etcd_data:/etcd
+
+  # Milvus 依赖的 S3 兼容对象存储，分别映射服务端口与控制台端口。
+  minio:
+    image: pgsty/silo:latest
+    container_name: devflow-ai-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_HOST_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - devflow_minio_data:/data
+
+  # 向量数据库 standalone 服务；依赖 etcd 与 MinIO，并对后端暴露查询端口。
+  milvus:
+    image: milvusdb/milvus:v2.4.11
+    container_name: devflow-ai-milvus
+    restart: unless-stopped
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    ports:
+      - "${MILVUS_HOST_PORT:-19530}:19530"
+      - "${MILVUS_HEALTH_PORT:-9091}:9091"
+    # 指定容器启动顺序；此列表本身不等于依赖服务已通过健康检查。
+    depends_on:
+      - etcd
+      - minio
+
+# 具名数据卷定义；上方各服务的 volumes 项指定它们挂载到容器中的位置。
+volumes:
+  devflow_postgres_data:
+  devflow_etcd_data:
+  devflow_minio_data:
